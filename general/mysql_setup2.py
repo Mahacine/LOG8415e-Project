@@ -1,6 +1,7 @@
 import os
 import paramiko
 from dotenv import load_dotenv
+import argparse
 
 # Define connection parameters
 port = 22
@@ -191,6 +192,14 @@ def mysql_setup(key_file_path, target_ip):
     gatekeeper_client.close()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='MySQL Setup Script')
+    parser.add_argument('target', type=str, help='Target type')
+    
+    args = parser.parse_args()
+    print(args.target)
+
     load_dotenv()
-    target_ip = os.getenv('MANAGER_IP')
+    target_ip = os.getenv(args.target)
+    print(target_ip)
+
     mysql_setup('./general/key-pair-lab2.pem', target_ip)

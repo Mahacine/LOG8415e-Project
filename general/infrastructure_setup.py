@@ -192,10 +192,8 @@ def main():
             
         time.sleep(1)
     
-    # Setup Env variables
-    # update_env_variable('WORD_COUNT_INSTANCE', test1_instances_dict['instance_1'].public_ip_address)
 
-    
+    """
     threads = []
     
     # Threads Mappers
@@ -205,13 +203,7 @@ def main():
         t = threading.Thread(target=mysql_setup2.mysql_setup, args=(f"./general/{INSTANCE_KEY_NAME}.pem", manager_ip))
         # Add thread to the global list
         threads.append(t)
-    """
-    # Threads Reducers
-    for _, instance_ in workers_instances_dict.items():
-        t = threading.Thread(target=mp_workers_deploy.deploy_worker, args=(instance_.public_ip_address, mappers_ips_str, reducers_ips_str, orchestrator_ips_str, f"./general/{INSTANCE_KEY_NAME}.pem", 'reducer_'))
-        # Add thread to the global list
-        threads.append(t)
-    """
+
     # Start threads
     for t in threads:
         t.start()
@@ -221,6 +213,7 @@ def main():
         t.join()
 
     print('Infrastructure Setup Done')
+    """
 
 if __name__ == "__main__":
     main()

@@ -107,10 +107,25 @@ def delete_route_table(route_table_id):
     ec2_client.delete_route_table(RouteTableId=route_table_id)
     print("Route table deleted successfully.")
 
-def delete_private_subnet(subnet_id):
-    print(f"Deleting subnet with ID: {subnet_id}...")
-    ec2_client.delete_subnet(SubnetId=subnet_id)
-    print("Subnet deleted successfully.")
+def delete_private_subnet(subnet_id, max_retries=15, delay=10):
+    print(f"Attempting to delete subnet with ID: {subnet_id}...")
+
+    for attempt in range(max_retries):
+        try:
+            # Attempt to delete the subnet
+            ec2_client.delete_subnet(SubnetId=subnet_id)
+            print("Subnet deleted successfully.")
+            return  # Exit the function if successful
+        except Exception as e:
+            print(f"Error deleting subnet: {e}")
+            if "DependencyViolation" in str(e):
+                print("Subnet still has dependencies. Retrying...")
+                time.sleep(delay)  # Wait before retrying
+            else:
+                print("Non-recoverable error encountered. Aborting.")
+                return
+
+    print("Max retries reached. Could not delete the subnet.")
 
 def delete_network_infra():
     load_dotenv()
@@ -136,6 +151,23 @@ def delete_network_infra():
     # Delete Route Table
     delete_route_table(route_table_id)
 
+def release_all_elastic_ips():
+    try:
+        # Retrieve all Elastic IP addresses
+        response = ec2_client.describe_addresses()
+        addresses = response['Addresses']
+
+        # Release each Elastic IP address
+        for address in addresses:
+            allocation_id = address['AllocationId']
+            print(f'Releasing Elastic IP: {address["PublicIp"]} (Allocation ID: {allocation_id})')
+            ec2_client.release_address(AllocationId=allocation_id)
+        
+        print("All Elastic IPs released successfully.")
+        
+    except Exception as e:
+        print("Error releasing Elastic IPs:", e)
+
 def cleanup_aws_resources():
     print("Starting cleanup of AWS resources...")
 
@@ -152,6 +184,8 @@ def cleanup_aws_resources():
     
     # Cleanup security groups
     delete_security_groups(security_group_names, 15, 10)
+
+    release_all_elastic_ips()
 
     print("AWS resource cleanup completed.")
 
