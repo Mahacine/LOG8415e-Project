@@ -2,6 +2,7 @@ import os
 import paramiko
 from pathlib import Path
 from dotenv import load_dotenv
+import json
 
 # Define connection parameters
 port = 22
@@ -52,7 +53,12 @@ if __name__ == "__main__":
     proxy_client.connect(proxy_ip, username=username, pkey=key, sock=proxy_channel)
 
     # Execute command on Trusted Host to access FastAPI
-    fastapi_command = f"curl http://{proxy_ip}:8000/"
+    # fastapi_command = f"curl http://{proxy_ip}:8000/direct/write"
+    data = {
+        "key": "someKey",
+        "value": "someValue"
+    }
+    fastapi_command = f"curl -X POST http://{proxy_ip}:8000/direct/write -H 'Content-Type: application/json' -d '{json.dumps(data)}'"
     stdin, stdout, stderr = trusted_host_client.exec_command(fastapi_command)
 
     # Print the output from the FastAPI request
