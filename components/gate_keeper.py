@@ -19,106 +19,54 @@ INSTANCE_KEY_NAME = "key-pair-lab2"
 key_file_path = f'/home/ubuntu/{INSTANCE_KEY_NAME}.pem'
 port = 22
 
-# Establish SSH client and connection to the trusted host
-def connect_to_trusted_host():
-    try:
-         # Load SSH private key
-        key = paramiko.RSAKey.from_private_key_file(key_file_path)
-
-        # Initialize SSH client for the gatekeeper
-        gatekeeper_client = paramiko.SSHClient()
-        gatekeeper_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        gatekeeper_client.load_system_host_keys()
-        
-        # Connect to the gatekeeper (we're already inside, but still need to initiate connection)
-        gatekeeper_client.connect(gatekeeper_ip, username=username, pkey=key)
-        
-        # Get the transport from the gatekeeper SSH connection
-        gatekeeper_transport = gatekeeper_client.get_transport()
-
-        # Open a direct TCP/IP channel to the trusted host
-        trusted_host_channel = gatekeeper_transport.open_channel("direct-tcpip", (trusted_host_ip, 22), (gatekeeper_ip, 0))
-
-        # Now, connect to the trusted host via the tunnel established in the gatekeeper
-        trusted_host_client = paramiko.SSHClient()
-        trusted_host_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        trusted_host_client.connect(trusted_host_ip, username=username, pkey=key, sock=trusted_host_channel)
-        
-        return trusted_host_client
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Connection failed: {str(e)}")
-
-# Function to establish the SSH tunnel
-def establish_ssh_tunnel():
-    try:
+def execute_curl_command(endpoint: str, data: dict = None):
+    # try:
         # Load SSH private key
         key = paramiko.RSAKey.from_private_key_file(key_file_path)
 
-        local_forward_port = 8080
+        trusted_host_client = paramiko.SSHClient()
+        trusted_host_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        trusted_host_client.connect(trusted_host_ip, username=username, pkey=key)
 
-        # Initialize SSH client
-        gatekeeper_client = paramiko.SSHClient()
-        gatekeeper_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        gatekeeper_client.connect(gatekeeper_ip, username=username, pkey=key)
+        # Install curl on Trusted Host (Debian/Ubuntu)
+        install_curl_command = "sudo apt-get install -y curl"
+        # trusted_host_client.exec_command(install_curl_command)
 
-        # Establish SSH tunnel to trusted host
-        transport = gatekeeper_client.get_transport()
-        # Forward local port (e.g., 8080) to trusted host on port 8000 (FastAPI port)
-        transport.request_port_forward('localhost', local_forward_port, trusted_host_ip, 8000)
-
-        print(f"SSH Tunnel established: Forwarding localhost:{local_forward_port} to {trusted_host_ip}:8000")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error establishing SSH tunnel: {str(e)}")
-
-def execute_curl_command(endpoint: str, data: dict = None):
-    try:
-        # establish_ssh_tunnel()
-
-        trusted_host_client = connect_to_trusted_host()
-
-        # Build the curl command to access the FastAPI endpoint
-        url = f"http://{proxy_ip}:8000/{endpoint}"
-        # url = 'http://172.31.99.236:8000/direct/write'
-        # url = f"http://localhost:8080/{endpoint}"
+        # Connect to Proxy
+        proxy_client = paramiko.SSHClient()
+        proxy_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        proxy_channel = trusted_host_client.get_transport().open_channel("direct-tcpip", (proxy_ip, 22), (trusted_host_ip, 0))
+        proxy_client.connect(proxy_ip, username=username, pkey=key, sock=proxy_channel)
         
         # If there's data to post, build the curl command with JSON payload
-        """
         if data:
-            curl_command = [
-                "curl", "-X", "POST", url,
-                "-H", "Content-Type: application/json",
-                "-d", json.dumps(data)
-            ]
+            curl_command = f"curl -X POST http://{proxy_ip}:8000/{endpoint} -H 'Content-Type: application/json' -d '{json.dumps(data)}'"
         else:
-            curl_command = ["curl", url]
-        """
-        if data:
-            curl_command = f"curl -X POST {url} -H 'Content-Type: application/json' -d '{json.dumps(data)}'"
-        else:
-            curl_command = f"curl {url}"
-        # Execute the curl command locally on the gatekeeper machine
-        # result = subprocess.run(curl_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            curl_command = f"curl http://{proxy_ip}:8000/{endpoint}"
+        
+        # Execute the curl command
         stdin, stdout, stderr = trusted_host_client.exec_command(curl_command)
 
-        """
-        # Get the output and error (if any)
-        output = result.stdout
-        error = result.stderr
-        """
         # Print the output from the FastAPI request
         output = stdout.read().decode()
         error = stderr.read().decode()
         
-        if error:
-            raise HTTPException(status_code=500, detail=f"Error executing curl command: {error}")
-        
-        # Parse the result as JSON (if it's JSON output)
+        # Step 1: Isolate the JSON part (before the newline)
+        json_part = (output + "\n" + error).split('\n')[0]
+
+        # Step 2: Parse the JSON string
         try:
-            return json.loads(output)
+            data = json.loads(json_part)
+            # Step 3: Extract the 'message' field
+            message = data.get("message", "No message found")
+            print(message)
         except json.JSONDecodeError:
-            return output  # Return raw output if not JSON
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error forwarding request: {str(e)}")
+            print("Error: Could not decode JSON.")
+        
+        return message
+    
+    # except Exception as e:
+    #    raise HTTPException(status_code=500, detail=f"Error forwarding request: {str(e)}")
 
 
 # Pydantic model for the data
@@ -132,15 +80,6 @@ def validate_url(endpoint: str):
     valid_endpoints = ['direct', 'random', 'custom']
     if not any(endpoint.startswith(ve) for ve in valid_endpoints):
         raise HTTPException(status_code=400, detail="Invalid URL path")
-
-"""
-# Trigger SSH tunnel setup on FastAPI startup
-@app.on_event("startup")
-def startup_event():
-    tunnel_thread = Thread(target=establish_ssh_tunnel)
-    tunnel_thread.daemon = True
-    tunnel_thread.start()
-"""
 
 # FastAPI Routes for Direct
 @app.post("/direct/write")
