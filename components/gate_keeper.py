@@ -71,8 +71,8 @@ def execute_curl_command(endpoint: str, data: dict = None):
 
 # Pydantic model for the data
 class CustomData(BaseModel):
-    key: str
-    value: str
+    first_name: str
+    last_name: str
 
 
 # Validation for URL endpoint

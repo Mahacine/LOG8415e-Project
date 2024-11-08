@@ -51,6 +51,7 @@ def deploy_proxy(key_file_path):
     # Transfer files using SCP
     with SCPClient(proxy_client.get_transport()) as scp:
         scp.put('./components/proxy.py', '/home/ubuntu/proxy.py')
+        scp.put(key_file_path, '/home/ubuntu/key-pair-lab2.pem')
     
     # Execute commands to set up and run FastAPI app
     commands = [
