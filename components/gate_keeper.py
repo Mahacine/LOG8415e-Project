@@ -115,3 +115,8 @@ async def custom_write(data: CustomData):
 async def custom_read():
     validate_url("custom/read")
     return execute_curl_command("custom/read")
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "OK"}

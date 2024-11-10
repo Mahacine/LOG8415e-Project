@@ -11,7 +11,7 @@ python -m venv venv
 & ./venv/Scripts/Activate.ps1
 
 # Install required libraries
-pip install boto3 paramiko scp matplotlib aiohttp python-dotenv requests pandas nest-asyncio
+pip install boto3 paramiko scp matplotlib aiohttp python-dotenv requests pandas nest-asyncio pydantic
 
 # Infrastructure setup
 python ./general/infrastructure_setup.py
@@ -28,6 +28,8 @@ python ./components/proxy_deploy.py
 # GateKeeper fast api in the background
 # Start-Process -FilePath "python.exe" -ArgumentList "./components/gate_keeper_deploy.py" -WindowStyle Hidden
 python ./components/gate_keeper_deploy.py
+
+python ./client/request_sender.py
 
 # Ask the user whether to delete the infrastructure
 $confirm = Read-Host "Do you want to delete the infrastructure? (y/n)"

@@ -176,6 +176,7 @@ def main():
 
         update_env_variable('GATE_ID', gatekeeper_instances_dict[instance_dict_key].instance_id)
         update_env_variable('GATE_IP', gatekeeper_instances_dict[instance_dict_key].public_ip_address)
+        update_env_variable('GATE_DNS', gatekeeper_instances_dict[instance_dict_key].public_dns_name)
 
     while True:
         statuses = ec2_client.describe_instance_status(InstanceIds=instances_ids)
