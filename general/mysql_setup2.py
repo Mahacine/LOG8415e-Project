@@ -152,7 +152,8 @@ def mysql_setup(key_file_path, target_ip):
         print(f"Error installing Sysbench: {error}")
     else:
         print("Sysbench installed.\n")
-
+    
+    """
     # Load Sakila Data
     print("Creating dbtest database...")
     stdin, stdout, stderr = manager_client.exec_command('sudo mysql < create database dbtest;')
@@ -162,11 +163,11 @@ def mysql_setup(key_file_path, target_ip):
         print(f"Error creating dbtest database: {error}")
     else:
         print("dbtest database created.\n")
-
     """
-    # Load Sakila Data
+
+    # Prepare for benchmark
     print("Preparing...")
-    stdin, stdout, stderr = manager_client.exec_command('sudo sysbench --db-driver=mysql --mysql-user=root --mysql-db=dbtest --range_size=100 --table_size=10000 --tables=2 --threads=1 --events=0 --time=60 --rand-type=uniform /usr/share/sysbench/oltp_read_only.lua prepare')
+    stdin, stdout, stderr = manager_client.exec_command('sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-user="root" --mysql-db=sakila prepare')
     print(stdout.read().decode().strip())
     error = stderr.read().decode().strip()
     if error:
@@ -176,14 +177,32 @@ def mysql_setup(key_file_path, target_ip):
 
     # Load Sakila Data
     print("Benchmark...")
-    stdin, stdout, stderr = manager_client.exec_command('sysbench --test=oltp --oltp-table-size=1000000 --oltp-test-mode=complex --oltp-read-only=off --num-threads=6 --max-time=60 --max-requests=0 --mysql-db=dbtest --mysql-user=root run')
-    print(stdout.read().decode().strip())
+    stdin, stdout, stderr = manager_client.exec_command('sudo sysbench /usr/share/sysbench/oltp_read_only.lua --mysql-user="root" --mysql-db=sakila run')
+    # Get the output from stdout and stderr
+    output = stdout.read().decode().strip()
     error = stderr.read().decode().strip()
+
+    # Define the path for the result file
+    result_file_path = "./general/mysql_benchmark_results.txt"
+
+    # Write the output (stdout and stderr) to a file
+    with open(result_file_path, "w") as result_file:
+        # Write standard output (stdout)
+        result_file.write("Benchmark Output:\n")
+        result_file.write(output + "\n")
+
+        # If there's any error in stderr, write it as well
+        if error:
+            result_file.write("\nError Output:\n")
+            result_file.write(error + "\n")
+
+        # Optionally, print a message indicating the file is written
+        print(f"Benchmark results written to {result_file_path}.")
+    
     if error:
         print(f"Error benchmarking: {error}")
     else:
         print("Benchmark done.\n")
-    """
 
     # Clean up
     manager_client.close()
