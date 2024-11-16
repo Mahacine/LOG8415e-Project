@@ -8,6 +8,7 @@ from datetime import datetime,timezone
 import nest_asyncio
 import json
 from pydantic import BaseModel
+from requests.exceptions import RequestException, HTTPError
 
 nest_asyncio.apply()
 
@@ -64,7 +65,7 @@ async def call_endpoint_http(session, request_num, scenario, request_type, custo
     print(f"Request {request_num}: All retry attempts failed")
     return None, "All retry attempts failed"
 
-# Function to check if LB's fastapi is up and running   
+# Function to check if GK's fastapi is up and running   
 def check_health(delay):
     while True:
         load_dotenv(override=True)
@@ -101,9 +102,37 @@ def check_health(delay):
         # Otherwise, pause for a delay before sending the next health check
         time.sleep(delay)
 
+# Function to check if GK's FastAPI is up and running
+def invalidate_url():
+    load_dotenv(override=True)
+    GATE_DNS = os.getenv('GATE_DNS', '')
+
+    try:
+        url = f"http://{GATE_DNS}:8000/other"
+        response = requests.get(url)
+
+        # Check if the response was successful
+        response.raise_for_status()
+
+        # Print the successful response
+        print(f"Status Code: {response.status_code}")
+        print(f"Response: {response.json()}")
+
+    except HTTPError as http_err:
+        # Handle HTTP errors (e.g., 404, 500, etc.)
+        print(f"HTTP error occurred: {http_err}")
+        if response is not None:
+            print(f"Response content: {response.text}")
+    
+    except RequestException as req_err:
+        # Handle other types of request exceptions (e.g., network issues)
+        print(f"Request error occurred: {req_err}")
+
+    except Exception as err:
+        # Handle other unexpected errors
+        print(f"An error occurred: {err}")
 
 # Generic function to calculate execution time for a couple of tasks
-# Calculates the execution time for each cluster
 async def measure_scenario_time(scenario, request_type, num_requests):
     start_time = time.time()
     
@@ -162,5 +191,7 @@ if __name__ == "__main__":
     start_time = datetime.now(timezone.utc)
     check_health(2)
     print('Infrastructure setup and App deployment Time - ', datetime.now(timezone.utc)-start_time)
-    print('***Starting client requests***')
+    print('\n***Initial Test for invalid url***\n')
+    invalidate_url()
+    print('\n***Starting client requests***\n')
     asyncio.run(main())

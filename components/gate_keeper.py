@@ -120,3 +120,8 @@ async def custom_read():
 @app.get("/health")
 async def health_check():
     return {"status": "OK"}
+
+# Invalid url endpoint
+@app.get("/other")
+async def invalidate_url():
+    validate_url("/other")
