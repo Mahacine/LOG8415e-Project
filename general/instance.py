@@ -184,6 +184,12 @@ def create_security_group(description, name, vpc_id):
                 "IpProtocol": "tcp",
                 "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
             },
+            {
+                "FromPort": -1,
+                "ToPort": -1,
+                "IpProtocol": "icmp",
+                "IpRanges": [{"CidrIp": "0.0.0.0/0"}]
+            },
         ],
     )
     

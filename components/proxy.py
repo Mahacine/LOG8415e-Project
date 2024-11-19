@@ -94,12 +94,55 @@ def get_fastest_worker(worker1_ip, worker2_ip):
     else:
         return 1
 
+def get_fastest_worker_fping(worker1_ip, worker2_ip):
+    # Function to ping multiple instances using fping and extract the average round-trip time
+    def ping_instances(worker1_ip, worker2_ip):
+        try:
+            # Run the fping command to ping both worker IPs at once
+            command = f"fping -C 1 -q {worker1_ip} {worker2_ip}"
+            result = subprocess.run(command, capture_output=True, text=True, shell=True)
+
+            if result.returncode == 0:
+                # Parse the average round-trip time for both pings
+                # Using regular expression to extract avg time from fping output
+                # avg_time1_match = re.search(rf'{worker1_ip}  : (\d+\.\d+)', result.stdout)
+                # avg_time2_match = re.search(rf'{worker2_ip}  : (\d+\.\d+)', result.stdout)
+                
+
+                elements = result.stderr.split('\n')
+                avg_time1 = float(elements[0].split(':')[1])
+                avg_time2 = float(elements[1].split(':')[1])
+                return avg_time1, avg_time2, result.stderr
+            
+            else:
+                return None, None, result.stderr
+        except Exception as e:
+            print(f"Error pinging instances: {e}")
+            return None, None, result.stderr
+
+    # Get the average ping times for both workers
+    avg_time1, avg_time2, result = ping_instances(worker1_ip, worker2_ip)
+
+    if avg_time1 is None:
+        print(f"Failed to ping Worker 1 ({worker1_ip})")
+    if avg_time2 is None:
+        print(f"Failed to ping Worker 2 ({worker2_ip})")
+
+    # Compare the average ping times
+    if avg_time1 is not None and avg_time2 is not None:
+        if avg_time1 < avg_time2:
+            return 0, avg_time1, avg_time2, result
+        else:
+            return 1 , avg_time1, avg_time2, result
+    else:
+        return 0, avg_time1, avg_time2, result
+
 # FastAPI Routes for Direct
 @app.post("/direct/write")
 async def direct_write(data: CustomData):
     query = f'sudo mysql -e "USE sakila; INSERT INTO actor (first_name, last_name) VALUES (\'{data.first_name}\', \'{data.last_name}\');"'
     result = execute_ssh_command(query,manager_ip)
-    message =  f"Direct - Write : Manager - {manager_ip} : {result}"
+    message =  f"Direct - Write : Manager - {manager_ip} : {result} Inserted ({data.first_name}, {data.last_name}) in table actor"
     logger.info(message)
     return {"message": message}
 
@@ -119,7 +162,7 @@ async def random_write(data: CustomData):
     result = execute_ssh_command(query, manager_ip)
     execute_ssh_command(query, worker1_ip)
     execute_ssh_command(query, worker2_ip)
-    message =  f"Random - Write : Manager - {manager_ip} : {result}"
+    message =  f"Random - Write : Manager - {manager_ip} : {result} Inserted ({data.first_name}, {data.last_name}) in table actor"
     logger.info(message)
     return {"message": message}
 
@@ -142,7 +185,7 @@ async def custom_write(data: CustomData):
     result = execute_ssh_command(query, manager_ip)
     execute_ssh_command(query, worker1_ip)
     execute_ssh_command(query, worker2_ip)
-    message =  f"Custom - Write : Manager - {manager_ip} : {result}"
+    message =  f"Custom - Write : Manager - {manager_ip} : {result} Inserted ({data.first_name}, {data.last_name}) in table actor"
     logger.info(message)
     return {"message": message}
 
@@ -150,9 +193,10 @@ async def custom_write(data: CustomData):
 async def custom_read():
     query = 'sudo mysql -e "USE sakila; SELECT COUNT(*) FROM actor;"'
     workers = [worker1_ip,worker2_ip]
-    fastest_index = get_fastest_worker(worker1_ip, worker2_ip)
+    # fastest_index = get_fastest_worker(worker1_ip, worker2_ip)
+    fastest_index, avg_time1, avg_time2, result_ping = get_fastest_worker_fping(worker1_ip, worker2_ip)
     result = execute_ssh_command(query,workers[fastest_index])
-    message =  f"Custom - Read : Worker{fastest_index+1} - {workers[fastest_index]} : {result}"
+    message =  f"Custom - Read : Worker{fastest_index+1} - {workers[fastest_index]} : {result} - Worker 1 : {avg_time1}ms VS Worker 2 : {avg_time2}ms"
     logger.info(message)
     return {"message": message}
 

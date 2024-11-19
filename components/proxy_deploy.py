@@ -58,6 +58,7 @@ def deploy_proxy(key_file_path):
         'sudo apt-get update',
         'sudo apt-get install python3 python3-pip -y',
         'sudo apt-get install python3-venv -y',
+        'sudo apt-get install fping -y',
         'python3 -m venv fastapi_env',
         'source fastapi_env/bin/activate',
         'fastapi_env/bin/pip install fastapi uvicorn paramiko scp pydantic',
