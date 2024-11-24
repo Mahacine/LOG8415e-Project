@@ -1,76 +1,86 @@
+from fastapi import FastAPI, HTTPException, Request
+import uvicorn
+import logging
 import os
+from pydantic import BaseModel
+import random
+import subprocess
+import re
 import paramiko
-from pathlib import Path
-from dotenv import load_dotenv
 import json
+from threading import Thread
 
-# Define connection parameters
-port = 22
-username = 'ubuntu'
-INSTANCE_KEY_NAME = "key-pair-lab2"
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-if __name__ == "__main__":
-    # Load environment variables from .env file
-    load_dotenv()
+# Create FastAPI app
+app = FastAPI()
 
-    # Get instance details from environment variables
-    gatekeeper_ip = os.getenv('GATE_IP')
-    trusted_host_ip = os.getenv('HOST_IP')
-    proxy_ip = os.getenv('PROXY_IP')
-    manager_ip = os.getenv('MANAGER_IP')
-    worker1_ip = os.getenv('WORKER1_IP')
-    worker2_ip = os.getenv('WORKER2_IP')
+proxy_ip = os.getenv('PROXY_IP', 'unknown')
 
-    # Load SSH key
-    parent_path = Path(__file__).resolve().parents[1]
-    key_file_path = f"{parent_path}/general/{INSTANCE_KEY_NAME}.pem"
-    key = paramiko.RSAKey.from_private_key_file(key_file_path)
+ssh_port = 22
+ssh_username = "ubuntu"
+private_key_path = '/home/ubuntu/key-pair-lab2.pem'
 
-    # Connect to Gatekeeper
-    gatekeeper_client = paramiko.SSHClient()
-    gatekeeper_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    gatekeeper_client.connect(gatekeeper_ip, username=username, pkey=key)
+# Pydantic model for the data
+class CustomData(BaseModel):
+    first_name: str
+    last_name: str
 
-    # Connect to Trusted Host
-    trusted_host_client = paramiko.SSHClient()
-    trusted_host_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    gatekeeper_transport = gatekeeper_client.get_transport()
-    trusted_host_channel = gatekeeper_transport.open_channel("direct-tcpip", (trusted_host_ip, 22), (gatekeeper_ip, 0))
-    trusted_host_client.connect(trusted_host_ip, username=username, pkey=key, sock=trusted_host_channel)
+def execute_curl_command(endpoint: str, data: dict = None):
+        # If there's data to post, build the curl command with JSON payload
+        if data:
+            curl_command = f"curl -X POST http://{proxy_ip}:8000/{endpoint} -H 'Content-Type: application/json' -d '{json.dumps(data)}'"
+        else:
+            curl_command = f"curl http://{proxy_ip}:8000/{endpoint}"
+        
+        # Execute the curl command
+        # stdin, stdout, stderr = trusted_host_client.exec_command(curl_command)
+        result = subprocess.run(curl_command, capture_output=True, text=True, shell=True)
 
-    # Install curl on Trusted Host (Debian/Ubuntu)
-    install_curl_command = "sudo apt-get update && sudo apt-get install -y curl"
-    trusted_host_client.exec_command(install_curl_command)
+        # Capture the output and error
+        output = result.stdout
+        error = result.stderr
+        
+        # Step 1: Isolate the JSON part (before the newline)
+        json_part = (output + "\n" + error).split('\n')[0]
 
-    stdin, stdout, stderr = trusted_host_client.exec_command(install_curl_command)
-    print(stdout.read().decode())
-    print(stderr.read().decode())
+        # Step 2: Parse the JSON string
+        try:
+            data = json.loads(json_part)
+            # Step 3: Extract the 'message' field
+            message = data.get("message", "No message found")
+            print(message)
+        except json.JSONDecodeError:
+            print("Error: Could not decode JSON.")
+        
+        # return message
+        return {"message": message}
 
-    # Connect to Proxy
-    proxy_client = paramiko.SSHClient()
-    proxy_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    proxy_channel = trusted_host_client.get_transport().open_channel("direct-tcpip", (proxy_ip, 22), (trusted_host_ip, 0))
-    proxy_client.connect(proxy_ip, username=username, pkey=key, sock=proxy_channel)
+# FastAPI Routes for Direct
+@app.post("/direct/write")
+async def direct_write(data: CustomData):
+    return execute_curl_command("direct/write", data.dict())
 
-    # Execute command on Trusted Host to access FastAPI
-    # fastapi_command = f"curl http://{proxy_ip}:8000/direct/write"
-    data = {
-        "key": "someKey",
-        "value": "someValue"
-    }
-    fastapi_command = f"curl -X POST http://{proxy_ip}:8000/direct/write -H 'Content-Type: application/json' -d '{json.dumps(data)}'"
-    stdin, stdout, stderr = trusted_host_client.exec_command(fastapi_command)
+@app.get("/direct/read")
+async def direct_read():
+    return execute_curl_command("direct/read")
 
-    # Print the output from the FastAPI request
-    output = stdout.read().decode()
-    error = stderr.read().decode()
+# FastAPI Routes for Random
+@app.post("/random/write")
+async def random_write(data: CustomData):
+    return execute_curl_command("random/write", data.dict())
 
-    if output:
-        print('Response from FastAPI:', output)
-    if error:
-        print('Error:', error)
+@app.get("/random/read")
+async def random_read():
+    return execute_curl_command("random/read")
 
-    # Clean up connections
-    proxy_client.close()
-    trusted_host_client.close()
-    gatekeeper_client.close()
+# FastAPI Routes for Custom
+@app.post("/custom/write")
+async def custom_write(data: CustomData):
+    return execute_curl_command("custom/write", data.dict())
+
+@app.get("/custom/read")
+async def custom_read():
+    return execute_curl_command("custom/read")
