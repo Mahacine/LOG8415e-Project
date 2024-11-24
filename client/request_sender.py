@@ -132,6 +132,50 @@ def invalidate_url():
         # Handle other unexpected errors
         print(f"An error occurred: {err}")
 
+async def invalid_write_request():
+    # Load environment variables
+    load_dotenv(override=True)
+    GATE_DNS = os.getenv('GATE_DNS', '')
+
+    # Define the scenario and request type for the URL
+    scenario = "direct"
+    request_type = "write"
+    
+    # Construct the request URL
+    url = f"http://{GATE_DNS}:8000/{scenario}/{request_type}"
+    
+    # Set the headers for the request
+    headers = {'Content-Type': 'application/json'}
+
+    # Create an instance of CustomData with a missing last_name
+    custom_data = CustomData(first_name='Test',last_name='')
+
+    # Convert the payload to a dictionary and then to JSON
+    payload = custom_data.dict()
+    json_payload = json.dumps(payload)
+
+    # Use aiohttp to send the request asynchronously
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, data=json_payload) as response:
+            # Get the status code of the response
+            status_code = response.status
+            
+            # Try to get the JSON response (error message)
+            try:
+                response_json = await response.json()
+            except Exception as e:
+                response_json = {"error": str(e)}
+
+            # If the status code is 400, it means the request was invalid due to missing fields
+            if status_code == 400:
+                error_message = response_json.get("detail", "No error message found.")
+                print(f"Error: {error_message}")
+            else:
+                # If the response is not an error, print the response
+                response_text = await response.text()
+                print(f"Response: {response_text}")
+    
+
 # Generic function to calculate execution time for a couple of tasks
 async def measure_scenario_time(scenario, request_type, num_requests):
     start_time = time.time()
@@ -193,5 +237,7 @@ if __name__ == "__main__":
     print('Infrastructure setup and App deployment Time - ', datetime.now(timezone.utc)-start_time)
     print('\n***Initial Test for invalid url***\n')
     invalidate_url()
+    print('\n***Initial Test for missing data in request***\n')
+    asyncio.run(invalid_write_request())
     print('\n***Starting client requests***\n')
     asyncio.run(main())
