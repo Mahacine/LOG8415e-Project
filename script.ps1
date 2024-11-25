@@ -22,14 +22,16 @@ python ./general/mysql_setup2.py WORKER1_IP
 python ./general/mysql_setup2.py WORKER2_IP
 
 # Proxy fast api in the background
-# Start-Process -FilePath "python.exe" -ArgumentList "./components/proxy_deploy.py" -WindowStyle Hidden
-python ./components/proxy_deploy.py
+Start-Process -FilePath "python.exe" -ArgumentList "./components/proxy_deploy.py" -WindowStyle Hidden
+# python ./components/proxy_deploy.py
 
-python ./components/trusted_host_deploy.py
+# Trusted Host fast api in the background
+Start-Process -FilePath "python.exe" -ArgumentList "./components/trusted_host_deploy.py" -WindowStyle Hidden
+# python ./components/trusted_host_deploy.py
 
 # GateKeeper fast api in the background
-# Start-Process -FilePath "python.exe" -ArgumentList "./components/gate_keeper_deploy.py" -WindowStyle Hidden
-python ./components/gate_keeper_deploy.py
+Start-Process -FilePath "python.exe" -ArgumentList "./components/gate_keeper_deploy.py" -WindowStyle Hidden
+# python ./components/gate_keeper_deploy.py
 
 python ./client/request_sender.py
 
