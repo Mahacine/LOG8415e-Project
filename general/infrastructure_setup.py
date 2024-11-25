@@ -193,7 +193,24 @@ def main():
             
         time.sleep(1)
     
-
+    # Assign custom security groups
+    # Trusted Host
+    gk_private_ip = gatekeeper_instances_dict['instance_1'].private_ip_address + '/32'
+    print(gk_private_ip)
+    trusted_host_sg = instance.create_custom_security_group('trusted_host_sg', 'trusted_host_sg', default_vpc_id, gk_private_ip)
+    instance.assign_custom_security_group_to_instance(host_instances[0], trusted_host_sg['GroupId'])
+    # Proxy
+    th_private_ip = host_instances_dict['instance_1'].private_ip_address + '/32'
+    print(th_private_ip)
+    proxy_sg = instance.create_custom_security_group('proxy_sg', 'proxy_sg', default_vpc_id, th_private_ip)
+    instance.assign_custom_security_group_to_instance(proxy_instances[0], proxy_sg['GroupId'])
+    # Cluster
+    proxy_private_ip = proxy_instances_dict['instance_1'].private_ip_address + '/32'
+    print(proxy_private_ip)
+    cluster_sg = instance.create_custom_security_group('cluster_sg', 'cluster_sg', default_vpc_id, proxy_private_ip)
+    instance.assign_custom_security_group_to_instance(manager_instances[0], cluster_sg['GroupId'])
+    instance.assign_custom_security_group_to_instance(workers_instances[0], cluster_sg['GroupId'])
+    instance.assign_custom_security_group_to_instance(workers_instances[1], cluster_sg['GroupId'])
     """
     threads = []
     

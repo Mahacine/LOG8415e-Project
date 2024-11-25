@@ -197,6 +197,62 @@ def create_security_group(description, name, vpc_id):
 
     return security_group
 
+# Implement security group
+def create_custom_security_group(description, name, vpc_id, ip_range):
+
+    security_group = ec2_client.create_security_group(
+        Description=description,
+        GroupName=name,
+        VpcId=vpc_id
+    )
+
+    # Authorize inbound traffic
+    ec2_client.authorize_security_group_ingress(
+        GroupId=security_group['GroupId'],
+        IpPermissions=[
+            {
+                "FromPort": 22, #SSH
+                "ToPort": 22,
+                "IpProtocol": "tcp",
+                "IpRanges": [{"CidrIp": ip_range}],
+            },
+            {
+                "FromPort": 80, #HTTP
+                "ToPort": 80,
+                "IpProtocol": "tcp",
+                "IpRanges": [{"CidrIp": ip_range}],
+            },
+            {
+                "FromPort": 443, #HTTPs
+                "ToPort": 443,
+                "IpProtocol": "tcp",
+                "IpRanges": [{"CidrIp": ip_range}],
+            },
+            {
+                "FromPort": -1,
+                "ToPort": -1,
+                "IpProtocol": "icmp",
+                "IpRanges": [{"CidrIp": ip_range}]
+            },
+            {
+                "FromPort": 8000, # FastAPI
+                "ToPort": 8000,
+                "IpProtocol": "tcp",
+                "IpRanges": [{"CidrIp": ip_range}],
+            },
+        ],
+    )
+    
+    # Outbound traffic is defined in the default rule available upon creation
+
+    return security_group
+
+def assign_custom_security_group_to_instance(instance_id, security_group_id):
+    ec2_client.modify_instance_attribute(
+        InstanceId=instance_id,
+        Groups=[security_group_id]
+    )
+
 def create_instance_connect_endpoint(security_group_id):
     default_vpc_id =  get_default_vpc_id()
     # Get the subnets for the default VPC

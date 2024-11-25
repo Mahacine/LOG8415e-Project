@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 INSTANCE_KEY_NAME = "key-pair-lab2"
 key_pair_names = [INSTANCE_KEY_NAME]
-security_group_names = ['lab_sec_grp']
+security_group_names = ['lab_sec_grp', 'trusted_host_sg', 'proxy_sg', 'cluster_sg']
 
 # Connect to ec2 client
 ec2_client = boto3.client('ec2')
