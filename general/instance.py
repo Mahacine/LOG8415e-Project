@@ -465,3 +465,49 @@ def update_route_table(nat_gateway_id):
         NatGatewayId=nat_gateway_id
     )
     print("Route table updated successfully.")
+
+# Function to create iptables rules on EC2 instance
+def configure_iptables(ssh, ip_range, instance_name):   
+    try:        
+        # Define iptables rules
+        iptables_commands = [
+            f"sudo iptables -F",
+            # f"sudo iptables -P INPUT DROP",
+            # f"sudo iptables -P FORWARD DROP",
+            # f"sudo iptables -P OUTPUT ACCEPT",
+            f"sudo iptables -A INPUT -i lo -j ACCEPT",  # Allow loopback
+            f"sudo iptables -A OUTPUT -o lo -j ACCEPT",  # Allow loopback output
+            f"sudo iptables -A INPUT -p tcp --dport 22 -s {ip_range} -j ACCEPT",  # SSH (Port 22)
+            f"sudo iptables -A INPUT -p tcp --dport 80 -s {ip_range} -j ACCEPT",  # HTTP (Port 80)
+            f"sudo iptables -A INPUT -p tcp --dport 443 -s {ip_range} -j ACCEPT",  # HTTPS (Port 443)
+            f"sudo iptables -A INPUT -p tcp --dport 8000 -s {ip_range} -j ACCEPT",  # FastAPI (Port 8000)
+            f"sudo iptables -A INPUT -p icmp -s {ip_range} -j ACCEPT",  # ICMP (Ping)
+            # DNS rules: Allow incoming and outgoing DNS on port 53 for both TCP and UDP
+            f"sudo iptables -A INPUT -p tcp --dport 53 -s {ip_range} -j ACCEPT",  # DNS TCP (Port 53)
+            f"sudo iptables -A INPUT -p udp --dport 53 -s {ip_range} -j ACCEPT",  # DNS UDP (Port 53)
+            f"sudo iptables -A OUTPUT -p tcp --dport 53 -d {ip_range} -j ACCEPT",  # DNS TCP (Port 53)
+            f"sudo iptables -A OUTPUT -p udp --dport 53 -d {ip_range} -j ACCEPT",  # DNS UDP (Port 53)
+            # Ephemeral Ports: Allow incoming traffic from ephemeral ports (source ports) for both TCP and UDP
+            f"sudo iptables -A INPUT -p udp --sport 32768:60999 -j ACCEPT",  # Ephemeral UDP source ports
+            f"sudo iptables -A INPUT -p tcp --sport 32768:60999 -j ACCEPT",  # Ephemeral TCP source ports
+            f"sudo iptables -A INPUT -p udp --dport 32768:60999 -j ACCEPT",  # Ephemeral UDP destination ports
+            f"sudo iptables -A INPUT -p tcp --dport 32768:60999 -j ACCEPT",  # Ephemeral TCP destination ports
+        ]
+        
+        # Execute each iptables command
+        for command in iptables_commands:
+            print(f"Executing: {command}")
+            stdin, stdout, stderr = ssh.exec_command(command)
+            # time.sleep(1)  # Give time for the command to process
+            print(stdout.read().decode())
+            err = stderr.read().decode()
+            if err:
+                print(f"Error: {err}")
+
+        # Save iptables rules (Debian/Ubuntu systems)
+        ssh.exec_command("sudo iptables-save > /etc/iptables/rules.v4")
+
+        print(f"iptables rules successfully applied on instance {instance_name}")
+
+    except Exception as e:
+        print(f"Error while configuring iptables: {str(e)}")

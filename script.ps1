@@ -16,6 +16,8 @@ pip install boto3 paramiko scp matplotlib aiohttp python-dotenv requests pandas 
 # Infrastructure setup
 python ./general/infrastructure_setup.py
 
+python ./general/iptables_setup.py
+
 # MySQL Setup
 python ./general/mysql_setup2.py MANAGER_IP
 python ./general/mysql_setup2.py WORKER1_IP
@@ -24,10 +26,12 @@ python ./general/mysql_setup2.py WORKER2_IP
 # Proxy fast api in the background
 Start-Process -FilePath "python.exe" -ArgumentList "./components/proxy_deploy.py" -WindowStyle Hidden
 # python ./components/proxy_deploy.py
+Start-Sleep -Seconds 10
 
 # Trusted Host fast api in the background
 Start-Process -FilePath "python.exe" -ArgumentList "./components/trusted_host_deploy.py" -WindowStyle Hidden
 # python ./components/trusted_host_deploy.py
+Start-Sleep -Seconds 10
 
 # GateKeeper fast api in the background
 Start-Process -FilePath "python.exe" -ArgumentList "./components/gate_keeper_deploy.py" -WindowStyle Hidden
